@@ -35,7 +35,7 @@ def aplicar_desconto(preco: float, percentual: float) -> float:
     """Retorna o preço final após aplicar um desconto percentual (0 a 100)."""
     if percentual < 0 or percentual > 100:
         raise ValueError("O percentual deve estar entre 0 e 100")
-    return round(preco - percentual, 2)
+    return round(preco * (1 - percentual / 100), 2)
 
 
 def calcular_frete(peso_kg: float) -> float:
