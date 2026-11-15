@@ -1,0 +1,67 @@
+# Pipeline do laboratório DevOps + IA Generativa (GitHub Actions)
+#   1) testes          -> roda pytest e salva o log como artefato
+#   2) diagnostico_ia  -> só executa quando os testes falham; a IA lê o log e sugere a correção
+
+name: CI com diagnóstico por IA
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  testes:
+    name: Testes automatizados
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Executar testes (pytest)
+        run: |
+          mkdir -p logs
+          set -o pipefail
+          python -m pytest -v --junitxml=logs/report.xml 2>&1 | tee logs/pytest.log
+
+      - name: Publicar log dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-testes
+          path: logs/
+
+  diagnostico_ia:
+    name: Diagnóstico com IA generativa
+    needs: testes
+    if: failure()          # só roda quando os testes falham
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Baixar log dos testes
+        uses: actions/download-artifact@v4
+        with:
+          name: logs-testes
+          path: logs
+
+      - name: Analisar falha com IA
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python ai_agent/analisar_logs.py logs/pytest.log logs/relatorio_ia.md
+
+      - name: Publicar relatório da IA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-ia
+          path: logs/relatorio_ia.md
